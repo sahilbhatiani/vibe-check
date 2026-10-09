@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { findLines, isApiRoute, isSourceFile, isTestFile, maskSecret } from "@/lib/engine/util";
+import { findLines, isApiRoute, isSourceFile, isTestFile, lineCount, maskSecret } from "@/lib/engine/util";
 
 describe("isSourceFile", () => {
   it.each(["app/page.tsx", "src/index.js", "lib/a.mjs", "server.cjs", "x.ts", "app.py", "main.go", "app.rb", "App.vue"])(
@@ -81,4 +81,15 @@ describe("maskSecret", () => {
     expect(maskSecret("abc")).toBe("••••");
     expect(maskSecret("")).toBe("••••");
   });
+});
+
+describe("lineCount", () => {
+  it.each([
+    ["", 0],
+    ["a", 1],
+    ["a\n", 1],
+    ["a\nb", 2],
+    ["a\r\nb\r\n", 2],
+    ["\n\n", 2],
+  ])("counts %j as %i lines", (content, n) => expect(lineCount(content)).toBe(n));
 });

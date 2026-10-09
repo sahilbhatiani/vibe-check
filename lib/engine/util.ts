@@ -73,6 +73,13 @@ export function findLines(content: string, regex: RegExp): number[] {
   return hits;
 }
 
+/** Number of lines in a file, not counting a trailing newline. */
+export function lineCount(content: string): number {
+  if (content === "") return 0;
+  const lines = content.split(/\r?\n/);
+  return lines[lines.length - 1] === "" ? lines.length - 1 : lines.length;
+}
+
 /**
  * Masks a secret for display: at most the first 5 characters (fewer for short values), then a
  * fixed-length mask so the real length isn't revealed. `maskSecret("sk-abc123…")` → `"sk-ab…••••"`.
