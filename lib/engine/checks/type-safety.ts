@@ -39,11 +39,12 @@ function strictState(tsconfig: RepoFile | undefined): StrictState {
   if (tsconfig?.content === undefined) return "unknown";
   const parsed = parseJsonc(tsconfig.content);
   if (typeof parsed !== "object" || parsed === null) return "unknown";
-  const config = parsed as { extends?: unknown; compilerOptions?: { strict?: unknown } };
+  const config = parsed as { extends?: unknown; references?: unknown; compilerOptions?: { strict?: unknown } };
   const strict = config.compilerOptions?.strict;
   if (strict === true) return "on";
-  // A base config we can't see may turn strict on. Only an explicit `false` counts then.
-  if (strict === undefined && config.extends !== undefined) return "unknown";
+  // A base config we can't see may turn strict on, and a solution-style config (Vite's template:
+  // `{ "files": [], "references": [...] }`) leaves it to the referenced configs. Only an explicit `false` counts then.
+  if (strict === undefined && (config.extends !== undefined || config.references !== undefined)) return "unknown";
   return "off";
 }
 

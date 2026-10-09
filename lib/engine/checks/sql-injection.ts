@@ -3,8 +3,10 @@ import { isSourceFile, isTestFile } from "../util";
 
 const MAX_FILES = 20;
 
-// Words that show a string is really SQL, so `execute(\`git ${cmd}\`)` or a GraphQL query isn't flagged.
-const SQL_WORDS = /\b(?:select|insert|update|delete|from|where|into|values|set|drop|order by)\b/i;
+// Statement shapes that show a string is really SQL, so `execute(\`git ${cmd}\`)`, a GraphQL query, or
+// English like `execute(\`Delete ${n} files from cache\`)` isn't flagged. Single words ("from", "set") aren't enough.
+const SQL_WORDS =
+  /\bselect\b[\s\S]*\bfrom\b|\binsert\s+into\b|\bupdate\b[\s\S]*\bset\b|\bdelete\s+from\b|\b(?:drop|alter|truncate)\s+table\b|\bwhere\b[\s\S]*(?:=|\blike\b|\bin\s*\()/i;
 
 // The call names we look at. `(?:^|[^\w$])` stands in for a lookbehind: `useQuery(` and `$queryRaw(` don't match.
 // Tagged templates (sql`…`, prisma.$queryRaw`…`) have no `(`, so they're never matched: they're the safe form.

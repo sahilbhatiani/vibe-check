@@ -9,7 +9,10 @@ export const MAX_FILE_BYTES = 200 * 1024;
 const CONCURRENCY = 10;
 const API_TIMEOUT_MS = 10_000;
 const RAW_TIMEOUT_MS = 8_000;
-
+// All downloads together get this long, so a slow GitHub can't push the scan past the function's time limit.
+const DOWNLOAD_BUDGET_MS = 25_000;
+// If more than this share of downloads fail, the checks would see too little to give an honest grade.
+const MAX_FAILED_SHARE = 0.5;
 
 /** A failure we can explain to the user. `status` is the HTTP status the API route should return. */
 export class GitHubError extends Error {
@@ -102,6 +105,9 @@ export function errorFromResponse(res: Response, now: Date = new Date()): GitHub
     return new GitHubError(429, `GitHub's rate limit was reached. Try again ${formatWait(resetAt, now)}.`, resetAt);
   }
   if (res.status === 404) return notFound();
+  if (res.status === 403 || res.status === 451) {
+    return new GitHubError(404, "GitHub isn't letting us read this repo. It may be blocked or restricted.");
+  }
   if (res.status === 401) {
     return new GitHubError(500, "The server's GitHub token was rejected. Please let the site owner know.");
   }
@@ -118,6 +124,8 @@ function notFound(): GitHubError {
 interface FetchOptions {
   token?: string;
   fetch?: typeof fetch;
+  /** Total time allowed for downloading file contents. For tests. */
+  downloadBudgetMs?: number;
 }
 
 interface RepoResponse {
@@ -188,18 +196,36 @@ export async function fetchSnapshot(ref: RepoRef, options: FetchOptions = {}): P
   const { paths, sampled } = selectFiles(blobs);
 
   const rawBase = `https://raw.githubusercontent.com/${encodePath(repo.full_name)}/${encodePath(repo.default_branch)}/`;
+  const budget = AbortSignal.timeout(options.downloadBudgetMs ?? DOWNLOAD_BUDGET_MS);
+  let failed = 0;
+  let skipped = 0;
   const contents = await mapWithConcurrency(paths, CONCURRENCY, async (path) => {
+    // Out of time: leave the rest out and mark the scan as sampled.
+    if (budget.aborted) {
+      skipped++;
+      return undefined;
+    }
     try {
-      const res = await doFetch(rawBase + encodePath(path), { signal: AbortSignal.timeout(RAW_TIMEOUT_MS) });
-      if (!res.ok) return undefined;
+      const signal = AbortSignal.any([AbortSignal.timeout(RAW_TIMEOUT_MS), budget]);
+      const res = await doFetch(rawBase + encodePath(path), { signal });
+      if (!res.ok) {
+        failed++;
+        return undefined;
+      }
       const text = await res.text();
       // Binary files that slipped through (e.g. a .json that isn't) aren't useful to any check.
       return text.includes("\u0000") ? undefined : text;
     } catch {
       // One unreadable file shouldn't fail the scan; the checks just won't see its contents.
+      if (budget.aborted) skipped++;
+      else failed++;
       return undefined;
     }
   });
+  // Grading a repo whose files we mostly couldn't read would hide real problems behind a good score.
+  if (failed > 0 && failed > paths.length * MAX_FAILED_SHARE) {
+    throw new GitHubError(500, "GitHub didn't send us most of this repo's files. Please try again in a minute.");
+  }
   const downloaded = new Map(paths.map((p, i) => [p, contents[i]]));
 
   const files: RepoFile[] = blobs.map((b) => {
@@ -213,7 +239,7 @@ export async function fetchSnapshot(ref: RepoRef, options: FetchOptions = {}): P
       repo: repo.full_name,
       defaultBranch: repo.default_branch,
       language: repo.language,
-      sampled: sampled || tree.truncated,
+      sampled: sampled || tree.truncated || failed > 0 || skipped > 0,
     },
   };
 }

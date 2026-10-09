@@ -13,6 +13,9 @@ describe("sql-injection", () => {
       "const { data } = useQuery(`/api/users/${id}`);",
       "await exec.execute(`git checkout ${branch}`);",
       "cursor.execute('SELECT * FROM users WHERE id = %s', (user_id,))",
+      // Ordinary English that happens to use SQL words
+      "await logger.execute(`Delete ${n} files from cache`);",
+      "await job.query(`Update ${name} settings`);",
     ].join("\n");
     const result = sqlInjection.run(makeSnapshot({ "lib/db.ts": src }));
     expect(result.status).toBe("pass");
