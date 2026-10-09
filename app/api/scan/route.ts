@@ -1,6 +1,7 @@
 import { runChecks } from "@/lib/engine";
 import { checks } from "@/lib/engine/checks";
 import { fetchSnapshot, GitHubError, parseRepoUrl } from "@/lib/github";
+import { generateSummary } from "@/lib/summary";
 
 export const maxDuration = 60;
 
@@ -29,7 +30,9 @@ export async function POST(request: Request): Promise<Response> {
 
   try {
     const snapshot = await fetchSnapshot(ref);
-    return Response.json(runChecks(snapshot, checks));
+    const report = runChecks(snapshot, checks);
+    const summary = await generateSummary(report);
+    return Response.json(summary ? { ...report, summary } : report);
   } catch (err) {
     if (err instanceof GitHubError) return errorResponse(err.status, err.message, err.resetAt);
     console.error("Scan failed:", err instanceof Error ? err.message : "unknown error");
