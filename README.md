@@ -4,7 +4,6 @@
 
 **Live:** https://vibe-check-beige-nine.vercel.app
 
-![A Vibe Check report: an AI summary, a C grade capped by a security finding, category bars and the findings list]
 <img width="960" height="540" alt="vibe-check-demo" src="https://github.com/user-attachments/assets/e4b775ee-c738-4c64-acab-dcd81b24a3ab" />
 
 
