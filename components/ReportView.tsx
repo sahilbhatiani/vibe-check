@@ -92,6 +92,21 @@ function Hero({ report }: { report: Report }) {
   );
 }
 
+function SummaryCard({ summary }: { summary: string }) {
+  const paragraphs = summary.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+  return (
+    <Card className="p-6 sm:p-10">
+      <h2 className="text-sm font-semibold text-zinc-500 dark:text-zinc-400">In plain English</h2>
+      <div className="mt-3 max-w-prose space-y-4 text-[17px] leading-relaxed text-zinc-800 dark:text-zinc-200">
+        {paragraphs.map((p, i) => (
+          <p key={i}>{p}</p>
+        ))}
+      </div>
+      <p className="mt-5 text-xs text-zinc-400 dark:text-zinc-500">Written by AI from the findings below. It never sees your code.</p>
+    </Card>
+  );
+}
+
 function CategoryBars({ checks }: { checks: CheckResult[] }) {
   return (
     <div className="grid gap-3 sm:grid-cols-3">
@@ -210,6 +225,7 @@ const SECONDARY_BUTTON =
 export function ReportView({ report, onScanAnother }: { report: Report; onScanAnother: () => void }) {
   return (
     <div className="space-y-6 sm:space-y-8">
+      {report.summary && <SummaryCard summary={report.summary} />}
       <Hero report={report} />
       <CategoryBars checks={report.checks} />
       <div className="pt-2">

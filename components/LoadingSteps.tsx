@@ -9,6 +9,7 @@ const STEPS: [afterMs: number, label: string][] = [
   [2600, "Downloading the code"],
   [5500, "Running the checks"],
   [9000, "Adding up the score"],
+  [11500, "Writing up the results"],
 ];
 
 export function LoadingSteps({ repo }: { repo: string }) {
