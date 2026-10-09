@@ -55,6 +55,12 @@ describe("type-safety", () => {
     expect(result.status).toBe("pass");
   });
 
+  it("doesn't fail on strict for a solution-style tsconfig (Vite's React template)", () => {
+    const tsconfig = '{ "files": [], "references": [{ "path": "./tsconfig.app.json" }, { "path": "./tsconfig.node.json" }] }';
+    const result = typeSafety.run(makeSnapshot({ "tsconfig.json": tsconfig, "a.ts": clean(10) }));
+    expect(result.status).toBe("pass");
+  });
+
   it("skips the strict part when tsconfig wasn't downloaded or can't be parsed", () => {
     expect(typeSafety.run(makeSnapshot({ "tsconfig.json": null, "a.ts": clean(10) })).status).toBe("pass");
     expect(typeSafety.run(makeSnapshot({ "tsconfig.json": "{ nope", "a.ts": clean(10) })).status).toBe("pass");

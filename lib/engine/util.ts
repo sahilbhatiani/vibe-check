@@ -43,11 +43,17 @@ export function isTestFile(path: string): boolean {
   return parts.slice(0, -1).some((s) => TEST_DIRS.has(s.toLowerCase()));
 }
 
+// Languages a request handler is written in. Excludes `.jsx`/`.tsx`/`.svelte`/`.vue`, which are UI components.
+const SERVER_EXTENSIONS = /\.(js|mjs|cjs|ts|mts|cts|py|rb|go)$/;
+
 /**
  * Files that handle HTTP requests on the server:
  * - Next.js App Router: `app/**\/route.ts` (optionally under `src/`)
  * - Next.js Pages Router: `pages/api/**` (optionally under `src/`)
- * - Express-style: anything in a `routes/` folder, or a top-level `api/` folder (Vercel functions)
+ * - Express-style: server-language files in a `routes/` folder, or a top-level `api/` folder (Vercel functions)
+ *
+ * UI page files that live in `routes/` folders (Remix/TanStack `.jsx`/`.tsx`, `.svelte`, `.vue`,
+ * SvelteKit `+page.*`/`+layout.*`) are not API routes. SvelteKit's `+server.*` files are.
  */
 export function isApiRoute(path: string): boolean {
   if (!isSourceFile(path) || isTestFile(path)) return false;
@@ -58,8 +64,13 @@ export function isApiRoute(path: string): boolean {
 
   if (root[0] === "app" && /^route\.[a-z]+$/.test(name)) return true;
   if (root[0] === "pages" && root[1] === "api") return true;
-  if (root[0] === "api") return true;
-  return dirs.includes("routes");
+  if (root[0] === "api" || dirs.includes("routes")) {
+    if (!SERVER_EXTENSIONS.test(name)) return false;
+    // SvelteKit: only `+server.*` handles requests; `+page.server.ts`, `+layout.ts` etc. render pages.
+    if (name.startsWith("+")) return /^\+server\./.test(name);
+    return true;
+  }
+  return false;
 }
 
 /** 1-based line numbers where `regex` matches. Flags other than `g`/`y` are respected. */

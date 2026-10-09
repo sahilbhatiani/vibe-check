@@ -14,6 +14,24 @@ describe("env-files", () => {
     expect(result.status).toBe("pass");
   });
 
+  it("passes on multi-part templates and dotenv-vault's encrypted file", () => {
+    const result = envFiles.run(
+      makeSnapshot({ ".env.local.example": "X=", ".env.development.sample": "X=", ".env.vault": null }),
+    );
+    expect(result.status).toBe("pass");
+  });
+
+  it("only warns when the env files are in test or fixture folders", () => {
+    const result = envFiles.run(makeSnapshot({ "tests/fixtures/.env": null, "src/__fixtures__/.env.test": null }));
+    expect(result.status).toBe("warn");
+    expect(result.files.map((f) => f.path)).toEqual(["tests/fixtures/.env", "src/__fixtures__/.env.test"]);
+  });
+
+  it("still fails when a real env file sits next to test ones", () => {
+    const result = envFiles.run(makeSnapshot({ "tests/fixtures/.env": null, ".env.local": null }));
+    expect(result.status).toBe("fail");
+  });
+
   it("fails on a committed .env file", () => {
     const result = envFiles.run(makeSnapshot({ ".env": null, "index.ts": "" }));
     expect(result.status).toBe("fail");

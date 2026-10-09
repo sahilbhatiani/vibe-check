@@ -1,36 +1,65 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Vibe Check
 
-## Getting Started
+**Is your AI-built app ready for real users?** Paste a public GitHub repo and get a production-readiness grade with a plain-English report: leaked keys, missing tests, unprotected endpoints, and what to fix first.
 
-First, run the development server:
+**Live:** https://vibe-check-beige-nine.vercel.app
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+![A Vibe Check report: an AI summary, a C grade capped by a security finding, category bars and the findings list](docs/screenshot.png)
+
+## What it does
+
+- Fetches a public repo from GitHub and runs 18 checks across **Security**, **Reliability** and **Maintainability**.
+- Scores it 0–100 with a letter grade. Any failed security check caps the grade at C.
+- Lists each finding with the files and line numbers involved, and a fix written for a non-technical founder.
+- Optionally adds a short AI summary ("what a senior engineer would tell you"), written from the findings only. It never sees your code.
+- Never shows a secret's value: findings show a masked preview (`sk-ab…••••`), and `.env` files are never downloaded.
+
+## How it's built
+
+```
+app/api/scan/route.ts     POST { url } → validate → fetch → run checks → optional summary
+lib/github.ts             URL parsing, tree + file fetching (250-file cap, 10 at a time)
+lib/engine/               Pure engine: RepoSnapshot in, Report out. No network, no env vars
+lib/engine/checks/*.ts    One file per check
+lib/summary.ts            Optional AI summary (Anthropic API), findings only
+components/               Report UI
+tests/                    Vitest, using tiny fake repos written inline
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+The engine is pure, so every check is tested against small fake repos built inline. The tests never touch the network. Checks are regex and file heuristics (no ASTs) and are tuned to prefer false negatives over false positives: heuristic checks like "unprotected routes" can only warn, never fail.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Stack: Next.js (App Router), TypeScript (strict), Tailwind, Vitest, deployed on Vercel. Built with Claude Code. See [`SPEC.md`](SPEC.md) for the full spec and [`PLAN.md`](PLAN.md) for the phased build plan.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Run it locally
 
-## Learn More
+```bash
+npm install
+npm run dev        # http://localhost:3000
+```
 
-To learn more about Next.js, take a look at the following resources:
+Optional environment variables (in `.env.local`):
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+| Variable | What it does |
+|---|---|
+| `GITHUB_TOKEN` | Raises GitHub's API limit from 60 to 5,000 requests/hour. A fine-grained token with public-repo read access is enough. |
+| `ANTHROPIC_API_KEY` | Turns on the AI summary. The app works fully without it. |
+| `ANTHROPIC_MODEL` | Overrides the model used for the summary. |
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Or use the API directly:
 
-## Deploy on Vercel
+```bash
+curl -s -X POST localhost:3000/api/scan -H 'content-type: application/json' \
+  -d '{"url":"https://github.com/vercel/next-learn"}'
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Link straight to a report with `/?repo=owner/name`.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Development
+
+```bash
+npm test           # all checks, scoring, fetching and summary tests
+npm run lint
+npm run build
+```
+
+CI runs lint, tests and build on every PR. Merging to `main` deploys to production on Vercel.

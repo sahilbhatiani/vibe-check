@@ -166,10 +166,11 @@ describe("error mapping", () => {
     expect(errorFromResponse(res, now).status).toBe(429);
   });
 
-  it("treats a 403 that isn't a rate limit as a server error", () => {
+  it("treats a 403 that isn't a rate limit, or a 451, as a repo we can't read", () => {
     const res = new Response("", { status: 403, headers: { "x-ratelimit-remaining": "42" } });
     expect(rateLimitReset(res, now)).toBeNull();
-    expect(errorFromResponse(res, now).status).toBe(500);
+    expect(errorFromResponse(res, now).status).toBe(404);
+    expect(errorFromResponse(new Response("", { status: 451 }), now).status).toBe(404);
   });
 
   it("maps other failures to 500", () => {
@@ -265,6 +266,28 @@ describe("fetchSnapshot", () => {
     });
     const snapshot = await fetchSnapshot(ref, { fetch: fetchFn, token: "" });
     expect(snapshot.files).toEqual([{ path: "a.ts", size: 10, content: "ok" }, { path: "b.ts", size: 10 }]);
+    expect(snapshot.meta.sampled).toBe(true);
+  });
+
+  it("fails the scan when most files can't be downloaded, rather than grading what's left", async () => {
+    const { fetchFn } = fakeGitHub({
+      tree: [{ path: "a.ts" }, { path: "b.ts" }, { path: "c.ts" }],
+      files: { "a.ts": "ok", "b.ts": "ok", "c.ts": "ok" },
+      failRaw: ["b.ts", "c.ts"],
+    });
+    await expect(fetchSnapshot(ref, { fetch: fetchFn, token: "" })).rejects.toMatchObject({ status: 500 });
+  });
+
+  it("stops downloading when the time budget runs out and marks the scan as sampled", async () => {
+    const { fetchFn } = fakeGitHub({ tree: [{ path: "a.ts" }], files: { "a.ts": "ok" } });
+    // Raw downloads hang until aborted.
+    const slow = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (!String(input).startsWith("https://raw.githubusercontent.com")) return fetchFn(input, init);
+      return new Promise<Response>((_, reject) => init?.signal?.addEventListener("abort", () => reject(new Error("aborted"))));
+    }) as typeof fetch;
+    const snapshot = await fetchSnapshot(ref, { fetch: slow, token: "", downloadBudgetMs: 20 });
+    expect(snapshot.files).toEqual([{ path: "a.ts", size: 10 }]);
+    expect(snapshot.meta.sampled).toBe(true);
   });
 
   it("drops binary content", async () => {

@@ -30,12 +30,15 @@ describe("isApiRoute", () => {
   it.each([
     "app/api/users/route.ts", "src/app/api/login/route.js", "app/webhook/route.ts",
     "pages/api/hello.ts", "src/pages/api/users/[id].ts",
-    "routes/users.js", "server/routes/auth.ts", "api/send.ts",
+    "routes/users.js", "server/routes/auth.ts", "api/send.ts", "src/routes/api/users/+server.ts",
   ])("accepts %s", (p) => expect(isApiRoute(p)).toBe(true));
 
   it.each([
     "app/page.tsx", "app/api/users/helpers.ts", "pages/index.tsx", "lib/api/client.ts",
     "routes/users.test.js", "routes/README.md", "node_modules/express/routes/index.js",
+    // UI pages in Remix, TanStack Router, SvelteKit and Vue projects
+    "app/routes/_index.tsx", "src/routes/about.jsx", "src/routes/+page.svelte", "src/routes/+page.server.ts",
+    "src/routes/+layout.ts", "src/routes/Home.vue", "api/v1/service.proto",
   ])("rejects %s", (p) => expect(isApiRoute(p)).toBe(false));
 });
 
